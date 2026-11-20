@@ -47,6 +47,34 @@ const colors = ['#e4572e', '#2e86ab', '#76b041', '#a23b72', '#f18f01', '#17bebb'
 // 已載入的圖層
 let loadedLayers = [];
 
+
+// 加入 click feature show info window 的功能
+// click feautres
+map.on('click', function(event) {
+	const fillIds = getFillLayerIds();
+	if (fillIds.length === 0) return; 
+
+	const features = map.queryRenderedFeatures(event.point, {layers: fillIds});
+	if (features.length === 0) return; // 沒有點到 feature
+
+	const html = features.map(featureToHtml).join('');
+
+	new maplibregl.Popup({maxWidth: '360px'})
+			.setLngLat(event.lngLat)
+			.setHTML(`<div class = "info">${html}</div>`)
+			.addTo(map); 
+}); 
+
+map.on('mousemove', function(event){
+	const fillIds = getFillLayerIds();
+	if (fillIds.length === 0) return;
+
+	const features = map.queryRenderedFeatures(event.point,{
+		layers: fillIds
+	}); 
+	map.getCanvas().style.cursor = features.length > 0 ? 'pointer': '';
+}); 
+
 folderInput.addEventListener('change', function(event){
 	clearLayers(); 
 	const allFiles = Array.from(event.target.files);
@@ -192,3 +220,52 @@ function clearLayers() {
         loadedLayers = [];
         layerList.innerHTML = '';
 }
+
+// 收集所有 fill layer 的 id
+function getFillLayerIds(){
+	const ids = [];
+	loadedLayers.forEach(function (record){
+		record.layerIds.forEach(function (id){
+			if (id.endsWith('-fill')){
+				ids.push(id); 
+			} 
+		}); 
+	});
+	return ids;
+} 
+
+
+function featureToHtml(feature){
+	// 找出圖徵來自哪個檔案
+	const record = loadedLayers.find(function (r){
+		return r.layerIds.includes(feature.layer.id); 
+	}); 
+
+	// attr row -> table row
+	const rows = Object.entries(feature.properties).map(function ([key, value]){
+		return `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(value)}</td></tr>`;
+	}).join('');
+
+	const idText = feature.id !== undefined ? ` · id ${escapeHtml(feature.id)}` : '';
+
+        return `
+                <section class="info-item">
+                        <h3>
+                                <span class="swatch" style="background: ${record.color}"></span>
+                                ${escapeHtml(record.name)}
+                        </h3>
+                        <p class="info-sub">${escapeHtml(feature.sourceLayer)}${idText}</p>
+                        <table class="info-table">${rows}</table>
+                </section>
+        `;
+}
+
+// trans HTML 特殊字元 (＆開頭）
+function escapeHtml(value){
+	return String(value)
+			.replaceAll('&', '&amp;')
+			.replaceAll('<', '&lt;')
+			.replaceAll('>','&gt;')
+			.replaceAll('"', '&quot;'); 
+}
+
