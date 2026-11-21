@@ -1,6 +1,8 @@
 # apple finder status file
 .DS_Store
 
+# any sensitive data
+.env
 
 # data folder
 data
